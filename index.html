@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>接待中心澆水表</title>
+<meta name="theme-color" content="#ECF1EE" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#13201A" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="澆水表">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+<script>
+  // ★ 部署 Apps Script 後，把「網頁應用程式網址」貼在這裡（結尾是 /exec）
+  window.SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwlvdGsaGH9b7sa83vsq9XyoGUUPstpJybrgsHX0Vj7OyA_d1Ar8jLoC5_K6ejWRKdgCA/exec';
+</script>
+<style>
+:root{
+  --bg:#ECF1EE; --card:#FFFFFF; --ink:#16241D; --muted:#5D6E65; --line:#D3DCD7;
+  --water:#2A6BB0; --water-soft:#D8E7F6; --water-ink:#FFFFFF;
+  --leaf:#2E7A4B; --leaf-soft:#E1EFE5; --alert:#B3382B; --alert-soft:#F7E3E0;
+  --radius-card:14px; --radius-btn:999px;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#13201A; --card:#1C2B24; --ink:#E6EEE9; --muted:#9DB0A6; --line:#2E4038;
+    --water:#5B9BE0; --water-soft:#1E3550; --water-ink:#0D1A12;
+    --leaf:#6BC08A; --leaf-soft:#1F3A2B; --alert:#F08A7C; --alert-soft:#3D2420;
+  }
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;
+  font-size:16px; line-height:1.5; -webkit-text-size-adjust:100%;
+  font-variant-numeric:tabular-nums;
+}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:3px solid var(--water);outline-offset:2px}
+.wrap{max-width:640px;margin:0 auto;padding:0 16px 32px}
+
+/* 頂部 */
+header{
+  position:sticky; top:env(safe-area-inset-top,0px); z-index:5;
+  background:var(--bg); padding:14px 0 10px;
+}
+.top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.date{font-size:15px;color:var(--muted)}
+.remain{font-size:26px;font-weight:700;letter-spacing:.01em;margin-top:2px}
+.remain.clear{color:var(--leaf)}
+.me{
+  border:1px solid var(--line); background:var(--card); border-radius:var(--radius-btn);
+  padding:6px 14px; font-size:15px; white-space:nowrap; margin-top:4px;
+}
+.tabs{display:flex;gap:6px;margin-top:12px;background:var(--line);padding:4px;border-radius:12px}
+.tab{
+  flex:1; border:0; background:transparent; border-radius:9px; padding:9px 4px;
+  font-size:15px; font-weight:600; color:var(--muted); display:flex;justify-content:center;align-items:center;gap:6px;
+}
+.tab[aria-selected="true"]{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.badge{min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--water);color:var(--water-ink);font-size:12px;line-height:20px;font-weight:700}
+.badge.zero{background:transparent;color:var(--leaf);padding:0}
+
+.banner{margin-top:10px;padding:8px 12px;border-radius:10px;font-size:14px;background:var(--water-soft);color:var(--ink)}
+.banner.err{background:var(--alert-soft)}
+
+/* 區塊 */
+h2{font-size:14px;font-weight:600;color:var(--muted);margin:22px 2px 8px}
+.list{display:flex;flex-direction:column;gap:10px}
+
+/* 卡片：左側水位條是整個 App 的視覺重點，代表距離下次該做還剩多少 */
+.card{
+  display:flex; background:var(--card); border-radius:var(--radius-card);
+  border:1px solid var(--line); overflow:hidden;
+}
+.gauge{width:12px;flex:none;background:var(--water-soft);position:relative}
+.gauge i{position:absolute;left:0;right:0;bottom:0;background:var(--water);transition:height .5s ease}
+.card.overdue .gauge{background:var(--alert-soft)}
+.body{flex:1;min-width:0;padding:12px 12px 12px 14px}
+.row1{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.name{font-size:18px;font-weight:700}
+.qty{font-size:15px;color:var(--muted)}
+.slot{font-size:13px;font-weight:600;color:var(--water);border:1px solid currentColor;border-radius:6px;padding:0 6px}
+.amount{font-size:15px;margin-top:2px}
+.amount b{font-weight:600}
+.status{font-size:14px;color:var(--muted);margin-top:6px}
+.status.due{color:var(--water);font-weight:600}
+.status.overdue{color:var(--alert);font-weight:600}
+.status.done{color:var(--leaf);font-weight:600}
+.warn{font-size:13px;color:var(--alert);margin-top:2px}
+.side{display:flex;flex-direction:column;justify-content:center;align-items:flex-end;gap:6px;padding:12px 12px 12px 0}
+.go{
+  border:0; background:var(--water); color:var(--water-ink); font-weight:700;
+  border-radius:var(--radius-btn); padding:12px 18px; font-size:16px; min-width:92px; white-space:nowrap;
+}
+.go.again{background:transparent;color:var(--water);border:1.5px solid var(--water);padding:8px 14px;font-size:14px;min-width:0}
+.go:active{transform:scale(.97)}
+.undo{border:0;background:none;color:var(--muted);font-size:14px;text-decoration:underline;padding:4px}
+.more{border:0;background:none;color:var(--muted);font-size:13px;padding:6px 0 0;text-align:left}
+.hist{margin:8px 0 0;padding:8px 0 0;border-top:1px dashed var(--line);font-size:14px;color:var(--muted);list-style:none}
+.hist li{display:flex;gap:10px}
+.hist .p{color:var(--ink)}
+.pending-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--water);margin-left:6px;vertical-align:middle}
+.empty{padding:18px;text-align:center;color:var(--muted);background:var(--card);border-radius:var(--radius-card);border:1px dashed var(--line)}
+
+/* 設定與初次使用 */
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sheet{
+  width:100%;max-width:640px;background:var(--card);border-radius:18px 18px 0 0;
+  padding:20px 20px calc(20px + env(safe-area-inset-bottom,0px));max-height:85vh;overflow:auto
+}
+.sheet h3{margin:0 0 4px;font-size:20px}
+.sheet p{margin:4px 0 14px;color:var(--muted);font-size:15px}
+.field{width:100%;font:inherit;font-size:17px;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+.people{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
+.person{border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:12px 8px;font-size:16px;font-weight:600}
+.person[aria-pressed="true"]{border-color:var(--water);background:var(--water-soft)}
+.primary{width:100%;border:0;background:var(--water);color:var(--water-ink);font-weight:700;border-radius:12px;padding:14px;font-size:17px;margin-top:14px}
+.linkish{border:0;background:none;color:var(--muted);text-decoration:underline;padding:10px 0;font-size:15px}
+.kv{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);font-size:15px}
+.kv span:first-child{color:var(--muted)}
+.errtext{color:var(--alert);font-size:14px;min-height:20px;margin-top:8px}
+.setup{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.setup .sheet{border-radius:18px;max-height:none}
+
+.toast{
+  position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);
+  background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:15px;opacity:0;
+  transition:opacity .2s,transform .2s;z-index:30;max-width:calc(100% - 32px);pointer-events:none
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+@media (prefers-reduced-motion: reduce){.gauge i,.toast{transition:none}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+'use strict';
+
+/* ---------- 狀態 ---------- */
+const LS = {
+  cfg: 'pw_cfg', cache: 'pw_cache', pending: 'pw_pending', zone: 'pw_zone'
+};
+const load = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } };
+const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+
+let cfg = load(LS.cfg, { key: '', person: '' });
+let data = load(LS.cache, null);        // { plants, people, logs, serverTime }
+let pending = load(LS.pending, []);     // 尚未同步的動作
+let zone = load(LS.zone, '');
+let lastSync = data ? data.serverTime : null;
+let syncError = '';
+let openCards = new Set();
+let showSettings = false;
+let setupStep = cfg.key ? (cfg.person ? null : 'person') : 'key';
+let busy = false;
+
+/* ---------- 日期工具（以手機當地時間為準） ---------- */
+const pad = n => String(n).padStart(2, '0');
+const WD = '日一二三四五六';
+const keyOf = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const numOf = key => { const [y, m, d] = key.split('-').map(Number); return Math.round(Date.UTC(y, m - 1, d) / 864e5); };
+const dayNumOfTime = iso => numOf(keyOf(new Date(iso)));
+const dateLabel = n => { const d = new Date(n * 864e5); return (d.getUTCMonth() + 1) + '/' + d.getUTCDate() + '（週' + WD[d.getUTCDay()] + '）'; };
+const timeLabel = iso => { const d = new Date(iso); return pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+const todayNum = () => numOf(keyOf(new Date()));
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
+
+const VERB = { '澆水': '澆好了', '泡水': '泡好了', '換水': '換好了', '噴水': '噴好了' };
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+/* ---------- 合併伺服器紀錄與尚未同步的動作 ---------- */
+function allLogs() {
+  const logs = data ? data.logs.slice() : [];
+  const ids = new Set(logs.map(l => l.id));
+  const undone = new Set(pending.filter(p => p.type === 'undo').map(p => p.id));
+  for (const p of pending) {
+    if (p.type === 'log' && !ids.has(p.id)) logs.push({ id: p.id, time: p.clientTime, taskId: p.taskId, person: p.person, pending: true });
+  }
+  return logs.filter(l => !undone.has(l.id));
+}
+
+/* ---------- 固定日期排程 ---------- */
+function computeTask(p, logs, t) {
+  const n = p.interval;
+  const start = p.start ? numOf(p.start) : t;
+  const mine = logs.filter(l => l.taskId === p.id).sort((a, b) => new Date(b.time) - new Date(a.time));
+  if (t < start) return { state: 'upcoming', next: start, level: 0, logs: mine };
+  const cur = start + Math.floor((t - start) / n) * n;
+  const next = cur + n;
+  const inCycle = mine.filter(l => dayNumOfTime(l.time) >= cur);
+  let missedPrev = null;
+  if (n > 1 && cur - n >= start) {
+    const prev = mine.filter(l => { const d = dayNumOfTime(l.time); return d >= cur - n && d < cur; });
+    if (!prev.length) missedPrev = cur - n;
+  }
+  if (inCycle.length) {
+    const todayCount = mine.filter(l => dayNumOfTime(l.time) === t).length;
+    return { state: 'done', cur, next, level: (next - t) / n, logs: mine, last: inCycle[0], todayCount };
+  }
+  if (cur === t) return { state: 'due', cur, next, level: 0, logs: mine, missedPrev };
+  return { state: 'overdue', cur, next, level: 0, late: t - cur, logs: mine, missedPrev };
+}
+
+function zonesOf(plants) {
+  const z = [];
+  plants.forEach(p => { if (p.zone && !z.includes(p.zone)) z.push(p.zone); });
+  return z;
+}
+
+/* ---------- 與 Apps Script 溝通 ---------- */
+async function api(payload) {
+  if (!/^https:\/\/script\.google\.com\//.test(window.SCRIPT_URL)) throw new Error('no_url');
+  const res = await fetch(window.SCRIPT_URL, {
+    method: 'POST',
+    body: JSON.stringify(Object.assign({ key: cfg.key }, payload)) // text/plain，不會觸發 CORS 預檢
+  });
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || 'server_error');
+  return json;
+}
+
+async function flush() {
+  while (pending.length) {
+    const item = pending[0];
+    try {
+      if (item.type === 'log') await api({ action: 'log', id: item.id, taskId: item.taskId, person: item.person, clientTime: item.clientTime });
+      else await api({ action: 'undo', id: item.id, person: item.person });
+      pending.shift(); save(LS.pending, pending);
+    } catch (e) {
+      if (e.message === 'bad_key') { syncError = '通行碼錯誤，請到設定重新輸入'; return false; }
+      if (['unknown_task', 'not_owner', 'missing_fields'].includes(e.message)) { pending.shift(); save(LS.pending, pending); continue; }
+      return false;
+    }
+  }
+  return true;
+}
+
+async function refresh(quiet) {
+  if (!cfg.key || busy) return;
+  busy = true;
+  try {
+    await flush();
+    const json = await api({ action: 'data' });
+    data = { plants: json.plants, people: json.people, logs: json.logs, serverTime: json.serverTime };
+    save(LS.cache, data);
+    lastSync = new Date().toISOString();
+    if (!syncError.startsWith('通行碼')) syncError = '';
+  } catch (e) {
+    if (e.message === 'bad_key') syncError = '通行碼錯誤，請到設定重新輸入';
+    else if (e.message === 'no_url') syncError = '尚未設定 Apps Script 網址（index.html 開頭的 SCRIPT_URL）';
+    else syncError = navigator.onLine ? '同步失敗，稍後會自動重試' : '目前離線，先記在手機上，連上網路後自動補傳';
+    if (!quiet) toast(syncError);
+  } finally {
+    busy = false;
+    render();
+  }
+}
+
+/* ---------- 動作 ---------- */
+function markDone(taskId) {
+  const p = data.plants.find(x => x.id === taskId);
+  const item = { type: 'log', id: uid(), taskId, person: cfg.person, clientTime: new Date().toISOString() };
+  pending.push(item); save(LS.pending, pending);
+  if (navigator.vibrate) navigator.vibrate(15);
+  toast('已記錄：' + p.name + (p.slot ? '（' + p.slot + '）' : '') + ' ' + p.action);
+  render();
+  refresh(true);
+}
+
+function undo(logId) {
+  if (!confirm('撤銷這筆紀錄？')) return;
+  const idx = pending.findIndex(x => x.type === 'log' && x.id === logId);
+  if (idx >= 0) pending.splice(idx, 1);           // 還沒送出，直接刪掉
+  else pending.push({ type: 'undo', id: logId, person: cfg.person });
+  save(LS.pending, pending);
+  toast('已撤銷');
+  render();
+  refresh(true);
+}
+
+/* ---------- 畫面 ---------- */
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+function render() {
+  const app = document.getElementById('app');
+  if (setupStep) { app.innerHTML = renderSetup(); bindSetup(); return; }
+  if (!data) { app.innerHTML = '<div class="setup"><div class="sheet"><h3>正在讀取資料</h3><p>' + esc(syncError || '第一次開啟需要連線') + '</p></div></div>'; return; }
+
+  const t = todayNum();
+  const logs = allLogs();
+  const zones = zonesOf(data.plants);
+  if (!zones.includes(zone)) zone = zones[0] || '';
+  const tasks = data.plants.map(p => Object.assign({ p }, computeTask(p, logs, t)));
+  const todo = tasks.filter(x => x.state === 'due' || x.state === 'overdue');
+  const countBy = z => todo.filter(x => x.p.zone === z).length;
+
+  const inZone = tasks.filter(x => x.p.zone === zone);
+  const zTodo = inZone.filter(x => x.state === 'overdue').concat(inZone.filter(x => x.state === 'due'));
+  const zDone = inZone.filter(x => x.state === 'done' || x.state === 'upcoming');
+
+  const pendingLogs = pending.length;
+  let banner = '';
+  if (syncError) banner = '<div class="banner err">' + esc(syncError) + (pendingLogs ? '（' + pendingLogs + ' 筆待補傳）' : '') + '</div>';
+  else if (pendingLogs) banner = '<div class="banner">同步中，' + pendingLogs + ' 筆待送出</div>';
+
+  app.innerHTML =
+    '<div class="wrap"><header>' +
+      '<div class="top"><div>' +
+        '<div class="date">' + esc(dateLabel(t)) + '</div>' +
+        (todo.length ? '<div class="remain">今天還有 ' + todo.length + ' 項</div>' : '<div class="remain clear">今天都完成了</div>') +
+      '</div><button class="me" data-act="settings" aria-label="設定">' + esc(cfg.person) + '</button></div>' +
+      '<div class="tabs" role="tablist">' + zones.map(z => {
+        const c = countBy(z);
+        return '<button class="tab" role="tab" data-zone="' + esc(z) + '" aria-selected="' + (z === zone) + '">' + esc(z) +
+          '<span class="badge' + (c ? '' : ' zero') + '">' + (c ? c : '✓') + '</span></button>';
+      }).join('') + '</div>' + banner +
+    '</header>' +
+    '<main>' +
+      '<h2>待完成</h2><div class="list">' + (zTodo.length ? zTodo.map(renderCard).join('') : '<div class="empty">這一區今天都處理好了</div>') + '</div>' +
+      (zDone.length ? '<h2>已完成／還沒到期</h2><div class="list">' + zDone.map(renderCard).join('') + '</div>' : '') +
+    '</main></div>' +
+    (showSettings ? renderSettings() : '');
+
+  bindMain();
+}
+
+function renderCard(x) {
+  const p = x.p, t = todayNum();
+  const qty = p.qty && p.qty !== '1' ? '<span class="qty">× ' + esc(p.qty) + ' 盆</span>' : '';
+  const slot = p.slot ? '<span class="slot">' + esc(p.slot) + '</span>' : '';
+  const every = p.interval > 1 ? '<span class="qty">每 ' + p.interval + ' 天</span>' : '';
+  const amount = '<div class="amount"><b>' + esc(p.action) + '</b>' + (p.amount ? '，' + esc(p.amount) : '') + '</div>';
+
+  let status = '', warn = '', side = '';
+  const verb = VERB[p.action] || '完成';
+  if (x.state === 'due') {
+    status = '<div class="status due">今天要做</div>';
+    side = '<button class="go" data-done="' + esc(p.id) + '">' + verb + '</button>';
+  } else if (x.state === 'overdue') {
+    status = '<div class="status overdue">逾期 ' + x.late + ' 天，原訂 ' + esc(dateLabel(x.cur)) + '</div>';
+    side = '<button class="go" data-done="' + esc(p.id) + '">' + verb + '</button>';
+  } else if (x.state === 'done') {
+    const l = x.last;
+    const when = dayNumOfTime(l.time) === t ? timeLabel(l.time) : esc(dateLabel(dayNumOfTime(l.time))) + ' ' + timeLabel(l.time);
+    status = '<div class="status done">' + esc(l.person) + ' ' + when + ' 完成' + (l.pending ? '<span class="pending-dot" title="待同步"></span>' : '') + '</div>';
+    if (p.multi && x.todayCount > 1) status += '<div class="status">今天共 ' + x.todayCount + ' 次</div>';
+    if (p.interval > 1) status += '<div class="status">下次 ' + esc(dateLabel(x.next)) + '</div>';
+    if (p.multi) side = '<button class="go again" data-done="' + esc(p.id) + '">再記一次</button>';
+    if (l.person === cfg.person && dayNumOfTime(l.time) === t) side += '<button class="undo" data-undo="' + esc(l.id) + '">撤銷</button>';
+  } else if (x.state === 'upcoming') {
+    status = '<div class="status">' + esc(dateLabel(x.next)) + ' 開始</div>';
+  }
+  if (x.missedPrev != null) warn = '<div class="warn">上一次 ' + esc(dateLabel(x.missedPrev)) + ' 沒有紀錄</div>';
+
+  const open = openCards.has(p.id);
+  const hist = open
+    ? '<ul class="hist">' + (x.logs.length ? x.logs.slice(0, 6).map(l =>
+        '<li><span>' + esc(dateLabel(dayNumOfTime(l.time))) + ' ' + timeLabel(l.time) + '</span><span class="p">' + esc(l.person) + '</span></li>').join('')
+        : '<li>最近 60 天沒有紀錄</li>') + '</ul>'
+    : '';
+
+  return '<article class="card ' + x.state + '">' +
+    '<div class="gauge" aria-hidden="true"><i style="height:' + Math.round(Math.max(0, Math.min(1, x.level)) * 100) + '%"></i></div>' +
+    '<div class="body">' +
+      '<div class="row1"><span class="name">' + esc(p.name) + '</span>' + qty + every + slot + '</div>' +
+      amount + status + warn +
+      '<button class="more" data-more="' + esc(p.id) + '" aria-expanded="' + open + '">' + (open ? '收起紀錄' : '最近紀錄') + '</button>' + hist +
+    '</div>' +
+    (side ? '<div class="side">' + side + '</div>' : '') +
+  '</article>';
+}
+
+function renderSettings() {
+  return '<div class="sheet-bg" data-act="close"><div class="sheet" role="dialog" aria-label="設定">' +
+    '<h3>設定</h3>' +
+    '<div class="kv"><span>目前使用者</span><span>' + esc(cfg.person) + '</span></div>' +
+    '<div class="kv"><span>上次同步</span><span>' + (lastSync ? esc(dateLabel(dayNumOfTime(lastSync))) + ' ' + timeLabel(lastSync) : '尚未同步') + '</span></div>' +
+    '<div class="kv"><span>待送出</span><span>' + pending.length + ' 筆</span></div>' +
+    '<button class="primary" data-act="refresh">立即同步</button>' +
+    '<button class="linkish" data-act="switch">換人使用</button><br>' +
+    '<button class="linkish" data-act="logout">重新輸入通行碼</button>' +
+  '</div></div>';
+}
+
+/* ---------- 初次設定 ---------- */
+let setupErr = '';
+let pickPerson = '';
+function renderSetup() {
+  if (setupStep === 'key') {
+    return '<div class="setup"><div class="sheet">' +
+      '<h3>接待中心澆水表</h3><p>請輸入同事給你的通行碼</p>' +
+      '<input id="key" class="field" type="password" autocomplete="off" placeholder="通行碼" value="">' +
+      '<div class="errtext">' + esc(setupErr) + '</div>' +
+      '<button class="primary" id="keyGo">下一步</button></div></div>';
+  }
+  const people = (data && data.people) || [];
+  return '<div class="setup"><div class="sheet">' +
+    '<h3>你是哪一位？</h3><p>打勾時會記錄是誰做的。名單在試算表的「人員」分頁。</p>' +
+    (people.length ? '<div class="people">' + people.map(n =>
+      '<button class="person" data-person="' + esc(n) + '" aria-pressed="' + (n === pickPerson) + '">' + esc(n) + '</button>').join('') + '</div>'
+      : '<p>名單是空的，請先在試算表「人員」分頁加上名字。</p>') +
+    '<div class="errtext">' + esc(setupErr) + '</div>' +
+    '<button class="primary" id="personGo"' + (pickPerson ? '' : ' disabled style="opacity:.5"') + '>開始使用</button></div></div>';
+}
+
+function bindSetup() {
+  const keyGo = document.getElementById('keyGo');
+  if (keyGo) {
+    const input = document.getElementById('key');
+    input.focus();
+    const go = async () => {
+      const k = input.value.trim();
+      if (!k) { setupErr = '請輸入通行碼'; render(); return; }
+      keyGo.disabled = true; keyGo.textContent = '連線中…';
+      cfg.key = k;
+      try {
+        const json = await api({ action: 'data' });
+        data = { plants: json.plants, people: json.people, logs: json.logs, serverTime: json.serverTime };
+        save(LS.cache, data); save(LS.cfg, cfg);
+        lastSync = new Date().toISOString();
+        setupErr = ''; setupStep = 'person';
+      } catch (e) {
+        cfg.key = '';
+        setupErr = e.message === 'bad_key' ? '通行碼不對，請再確認一次'
+          : e.message === 'no_url' ? '這個 App 還沒設定 Apps Script 網址'
+          : '連不上伺服器，請確認網路後再試';
+      }
+      render();
+    };
+    keyGo.onclick = go;
+    input.onkeydown = e => { if (e.key === 'Enter') go(); };
+    return;
+  }
+  document.querySelectorAll('[data-person]').forEach(b => b.onclick = () => { pickPerson = b.dataset.person; render(); });
+  const personGo = document.getElementById('personGo');
+  if (personGo) personGo.onclick = () => {
+    if (!pickPerson) return;
+    cfg.person = pickPerson; save(LS.cfg, cfg);
+    setupStep = null; render();
+  };
+}
+
+function bindMain() {
+  document.querySelectorAll('[data-zone]').forEach(b => b.onclick = () => { zone = b.dataset.zone; save(LS.zone, zone); render(); window.scrollTo(0, 0); });
+  document.querySelectorAll('[data-done]').forEach(b => b.onclick = () => markDone(b.dataset.done));
+  document.querySelectorAll('[data-undo]').forEach(b => b.onclick = () => undo(b.dataset.undo));
+  document.querySelectorAll('[data-more]').forEach(b => b.onclick = () => {
+    const id = b.dataset.more; openCards.has(id) ? openCards.delete(id) : openCards.add(id); render();
+  });
+  document.querySelectorAll('[data-act]').forEach(el => el.onclick = e => {
+    const act = el.dataset.act;
+    if (act === 'close' && e.target !== el) return;
+    e.stopPropagation();
+    if (act === 'settings') { showSettings = true; render(); }
+    else if (act === 'close') { showSettings = false; render(); }
+    else if (act === 'refresh') { showSettings = false; refresh(false).then(() => { if (!syncError) toast('已同步'); }); }
+    else if (act === 'switch') { showSettings = false; pickPerson = ''; setupStep = 'person'; render(); }
+    else if (act === 'logout') {
+      if (!confirm('要清除通行碼並重新設定嗎？尚未送出的紀錄會保留。')) return;
+      showSettings = false; cfg = { key: '', person: '' }; save(LS.cfg, cfg); setupErr = ''; setupStep = 'key'; render();
+    }
+  });
+}
+
+/* ---------- 啟動 ---------- */
+render();
+if (cfg.key) refresh(true);
+setInterval(() => { if (document.visibilityState === 'visible') refresh(true); }, 60000);
+setInterval(() => { if (!setupStep) render(); }, 60000); // 跨過午夜時更新狀態
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refresh(true); });
+window.addEventListener('online', () => refresh(true));
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
+</script>
+</body>
+</html>
